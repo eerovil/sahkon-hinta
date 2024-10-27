@@ -1,0 +1,144 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Electricity Prices</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="prices.js"></script>
+</head>
+<body>
+  <canvas id="priceChart" width="800" height="400"></canvas>
+
+  <script>
+    // Load data from prices.js
+    const data = window.PRICES;
+
+    // Parse URL parameters for marginal and delivery prices
+    const urlParams = new URLSearchParams(window.location.search);
+    const marginalPrice = parseFloat(urlParams.get('marginal')) || 0;
+    const deliveryPrice = parseFloat(urlParams.get('delivery')) || 0;
+
+    // Prepare data for chart with adjustments for each component
+    const chartLabels = data.prices.map(item => new Date(item.startDate));
+
+    const adjustedMarginalPrices = [];
+    const adjustedDeliveryPrices = [];
+    const adjustedHourlyPrices = [];
+
+    data.prices.forEach(item => {
+      let adjustedMarginal = marginalPrice;
+      let adjustedDelivery = deliveryPrice;
+      let adjustedHourly = item.price;
+
+      // If hourly price is negative, reduce marginal and delivery until they reach zero
+      if (adjustedHourly < 0) {
+        const reduction = Math.min(-adjustedHourly, adjustedMarginal + adjustedDelivery);
+        
+        // Distribute reduction between marginal and delivery
+        if (reduction <= adjustedMarginal) {
+          adjustedMarginal -= reduction;
+        } else {
+          adjustedDelivery -= (reduction - adjustedMarginal);
+          adjustedMarginal = 0;
+        }
+
+        // Set hourly to 0 if fully compensated by marginal and delivery, otherwise show remaining negative
+        adjustedHourly = adjustedHourly + reduction;
+      }
+
+      adjustedMarginalPrices.push(adjustedMarginal);
+      adjustedDeliveryPrices.push(adjustedDelivery);
+      adjustedHourlyPrices.push(adjustedHourly);
+    });
+
+    // Function to calculate gradient color (green - yellow - red) based on hourly price
+    function getColorForHourlyPrice(price) {
+      const minPrice = 5;
+      const midPrice = 17.5;
+      const maxPrice = 30;
+      
+      if (price <= midPrice) {
+        // Green to yellow gradient
+        const ratio = (price - minPrice) / (midPrice - minPrice);
+        const red = Math.floor(255 * ratio);
+        const green = 255;
+        return `rgba(${red}, ${green}, 0, 0.6)`;
+      } else {
+        // Yellow to red gradient
+        const ratio = (price - midPrice) / (maxPrice - midPrice);
+        const red = 255;
+        const green = Math.floor(255 * (1 - ratio));
+        return `rgba(${red}, ${green}, 0, 0.6)`;
+      }
+    }
+
+    // Create color array for the hourly prices based on the green-yellow-red gradient
+    const hourlyColors = adjustedHourlyPrices.map(price => getColorForHourlyPrice(price));
+
+    // Render stacked bar chart
+    const ctx = document.getElementById('priceChart').getContext('2d');
+    new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: chartLabels,
+        datasets: [
+          {
+            label: 'Marginal Price (c/kWh)',
+            data: adjustedMarginalPrices,
+            backgroundColor: 'rgba(200, 200, 200, 0.3)', // Muted gray
+            borderColor: 'rgba(200, 200, 200, 0.5)',
+            borderWidth: 1
+          },
+          {
+            label: 'Delivery Price (c/kWh)',
+            data: adjustedDeliveryPrices,
+            backgroundColor: 'rgba(150, 150, 150, 0.3)', // Muted darker gray
+            borderColor: 'rgba(150, 150, 150, 0.5)',
+            borderWidth: 1
+          },
+          {
+            label: 'Hourly Price (c/kWh)',
+            data: adjustedHourlyPrices,
+            backgroundColor: hourlyColors, // Apply green-yellow-red gradient colors
+            borderColor: 'rgba(0, 0, 0, 0.1)',
+            borderWidth: 1
+          }
+        ]
+      },
+      options: {
+        scales: {
+          x: {
+            type: 'time',
+            time: {
+              unit: 'hour',
+              displayFormats: {
+                hour: 'HH' // Display hour in 24-hour format
+              }
+            },
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Hour (24h format)'
+            }
+          },
+          y: {
+            beginAtZero: true,
+            stacked: true,
+            title: {
+              display: true,
+              text: 'Total Cost (c/kWh)'
+            }
+          }
+        },
+        plugins: {
+          legend: {
+            display: true
+          }
+        }
+      }
+    });
+  </script>
+</body>
+</html>
