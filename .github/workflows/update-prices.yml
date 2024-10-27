@@ -13,17 +13,12 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v2
 
-      - name: Fetch latest prices
-        id: fetch_prices
+      - name: Fetch and save latest prices
         run: |
-          curl -s https://api.porssisahko.net/v1/latest-prices.json -o latest-prices.json
-          node -e "
-          const fs = require('fs');
-          const data = JSON.parse(fs.readFileSync('latest-prices.json', 'utf8'));
-          const output = \`window.PRICES = ${JSON.stringify({ prices: data.prices })};\`;
-          fs.writeFileSync('prices.js', output);
-          "
-          
+          # Fetch data, escape single quotes, and wrap it in `window.PRICES = JSON.parse(...);`
+          json_data=$(curl -s https://api.porssisahko.net/v1/latest-prices.json | sed "s/'/\\'/g")
+          printf "window.PRICES = JSON.parse('%s');" "$json_data" > prices.js
+
       - name: Commit and push changes
         run: |
           git config --global user.name 'github-actions[bot]'
