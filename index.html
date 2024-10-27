@@ -6,10 +6,26 @@
   <title>Electricity Prices</title>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-annotation@1.0.0"></script>
   <script src="prices.js"></script>
+  <style>
+    /* Make the canvas fill the entire window */
+    body, html {
+      margin: 0;
+      padding: 0;
+      overflow: hidden;
+      height: 100%;
+      width: 100%;
+    }
+    canvas {
+      display: block;
+      height: 100vh;
+      width: 100vw;
+    }
+  </style>
 </head>
 <body>
-  <canvas id="priceChart" width="800" height="400"></canvas>
+  <canvas id="priceChart"></canvas>
 
   <script>
     // Load data from prices.js
@@ -26,8 +42,11 @@
     const adjustedMarginalPrices = [];
     const adjustedDeliveryPrices = [];
     const adjustedHourlyPrices = [];
+    let currentHourPrice = null;
 
-    data.prices.forEach(item => {
+    const now = new Date();
+
+    data.prices.forEach((item, index) => {
       let adjustedMarginal = marginalPrice;
       let adjustedDelivery = deliveryPrice;
       let adjustedHourly = item.price;
@@ -51,6 +70,13 @@
       adjustedMarginalPrices.push(adjustedMarginal);
       adjustedDeliveryPrices.push(adjustedDelivery);
       adjustedHourlyPrices.push(adjustedHourly);
+
+      // Check if the current time falls within this bar's time range
+      const startTime = new Date(item.startDate);
+      const endTime = new Date(item.endDate);
+      if (now >= startTime && now < endTime) {
+        currentHourPrice = adjustedMarginal + adjustedDelivery + adjustedHourly;
+      }
     });
 
     // Function to calculate gradient color (green - yellow - red) based on hourly price
@@ -85,21 +111,21 @@
         labels: chartLabels,
         datasets: [
           {
-            label: 'Marginal Price (c/kWh)',
+            label: 'Marginaali (c/kWh)',
             data: adjustedMarginalPrices,
             backgroundColor: 'rgba(200, 200, 200, 0.3)', // Muted gray
             borderColor: 'rgba(200, 200, 200, 0.5)',
             borderWidth: 1
           },
           {
-            label: 'Delivery Price (c/kWh)',
+            label: 'Siirto (c/kWh)',
             data: adjustedDeliveryPrices,
             backgroundColor: 'rgba(150, 150, 150, 0.3)', // Muted darker gray
             borderColor: 'rgba(150, 150, 150, 0.5)',
             borderWidth: 1
           },
           {
-            label: 'Hourly Price (c/kWh)',
+            label: 'Sähkö (c/kWh)',
             data: adjustedHourlyPrices,
             backgroundColor: hourlyColors, // Apply green-yellow-red gradient colors
             borderColor: 'rgba(0, 0, 0, 0.1)',
@@ -108,6 +134,8 @@
         ]
       },
       options: {
+        responsive: true,
+        maintainAspectRatio: false,
         scales: {
           x: {
             type: 'time',
@@ -119,22 +147,53 @@
             },
             stacked: true,
             title: {
-              display: true,
-              text: 'Hour (24h format)'
+              display: false,
+              text: 'Tunti'
             }
           },
           y: {
             beginAtZero: true,
             stacked: true,
             title: {
-              display: true,
-              text: 'Total Cost (c/kWh)'
+              display: false,
+              text: 'c/kWh'
             }
           }
         },
         plugins: {
           legend: {
-            display: true
+            display: false // Hide legend
+          },
+          annotation: {
+            annotations: {
+              line1: {
+                type: 'line',
+                xMin: now,
+                xMax: now,
+                borderColor: 'red',
+                borderWidth: 2,
+                label: {
+                  content: `${currentHourPrice ? currentHourPrice.toFixed(2) : 'N/A'} c/kWh`,
+                  enabled: currentHourPrice !== null,
+                  position: 'start',
+                  backgroundColor: 'rgba(255, 99, 132, 0.8)',
+                  color: 'white'
+                }
+              }
+            }
+          },
+          tooltip: {
+            callbacks: {
+              title: (context) => {
+                // Show only the hour in tooltip title
+                const date = context[0].parsed.x;
+                console.log(date);
+                console.log(new Date(date));
+                const hour = new Date(date).getHours();
+                const total = context[0].parsed.y + adjustedMarginalPrices[context[0].dataIndex] + adjustedDeliveryPrices[context[0].dataIndex];
+                return `${hour}:00 - ${total.toFixed(2)} c/kWh`;
+              }
+            }
           }
         }
       }
