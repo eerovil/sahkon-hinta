@@ -1,0 +1,35 @@
+name: Update Prices
+
+on:
+  schedule:
+    - cron: '0 * * * *'  # Runs every hour
+  workflow_dispatch:      # Allows manual triggering
+
+jobs:
+  fetch-latest-prices:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Fetch latest prices
+        id: fetch_prices
+        run: |
+          curl -s https://api.porssisahko.net/v1/latest-prices.json -o latest-prices.json
+          node -e "
+          const fs = require('fs');
+          const data = JSON.parse(fs.readFileSync('latest-prices.json', 'utf8'));
+          const output = \`window.PRICES = ${JSON.stringify({ prices: data.prices })};\`;
+          fs.writeFileSync('prices.js', output);
+          "
+          
+      - name: Commit and push changes
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add prices.js
+          git commit -m 'Update prices.js with latest data'
+          git push
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
