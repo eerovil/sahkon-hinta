@@ -16,9 +16,15 @@ jobs:
 
       - name: Fetch and save latest prices
         run: |
-          # Fetch data, escape single quotes, and wrap it in `window.PRICES = JSON.parse(...);`
-          json_data=$(curl -s https://api.porssisahko.net/v1/latest-prices.json | sed "s/'/\\'/g")
-          printf "window.PRICES = JSON.parse('%s');" "$json_data" > prices.js
+          # Fetch data
+          json_data=$(curl -s https://api.porssisahko.net/v1/latest-prices.json)
+          
+          # Validate JSON
+          echo "$json_data" | jq . > /dev/null
+          
+          # Escape single quotes and wrap it in `window.PRICES = JSON.parse(...);`
+          escaped_json=$(echo "$json_data" | sed "s/'/\\'/g")
+          printf "window.PRICES = JSON.parse('%s');" "$escaped_json" > prices.js
 
       - name: Commit and push changes
         run: |
