@@ -17,7 +17,7 @@ jobs:
       - name: Fetch and save latest prices
         run: |
           # Fetch data
-          json_data=$(curl -s https://api.porssisahko.net/v1/latest-prices.json)
+          json_data=$(curl -s https://api.porssisahko.net/v2/latest-prices.json)
           
           # Validate JSON
           echo "$json_data" | jq . > /dev/null
